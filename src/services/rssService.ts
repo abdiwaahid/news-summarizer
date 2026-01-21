@@ -26,17 +26,14 @@ export const RssService = {
                 for (const item of items) {
                     const title = item.querySelector("title")?.textContent || "";
                     const link = item.querySelector("link")?.textContent || "";
-                    const pubDateStr = item.querySelector("pubDate")?.textContent || "";
+                    const pubDate = item.querySelector("pubDate")?.textContent || "";
 
-                    const pubDate = new Date(pubDateStr);
-                    if (pubDate >= today) {
                     statements.push(
                         env.DB.prepare(`
                             INSERT OR IGNORE INTO news (title, url, pub_date) 
                             VALUES (?, ?, ?, ?)
                         `).bind(title, link, pubDate)
                     );
-                    }
                 }
             } catch (err) {
                 console.error(`Failed to fetch RSS from ${url}:`, err);

@@ -49,7 +49,7 @@ export default {
 	fetch: app.fetch,
 	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
 		switch (event.cron) {
-            case "*/20 * * * *":
+            case "*/11 * * * *":
                 ctx.waitUntil(RssService.syncAll(env));
                 break;
             case "*/10 * * * *":
