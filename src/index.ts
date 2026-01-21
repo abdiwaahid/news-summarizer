@@ -1,9 +1,8 @@
 import { ApiException, fromHono } from "chanfana";
 import { Hono } from "hono";
-import { tasksRouter } from "./endpoints/tasks/router";
 import { newsRouter } from "./endpoints/news/router";
 import { ContentfulStatusCode } from "hono/utils/http-status";
-import { DummyEndpoint } from "./endpoints/dummyEndpoint";
+import { ScraperService } from "./services/scraper";
 
 // Start a Hono app
 const app = new Hono<{ Bindings: Env }>();
@@ -43,5 +42,11 @@ const openapi = fromHono(app, {
 
 openapi.route("/news", newsRouter);
 
-// Export the Hono app
-export default app;
+
+export default {
+	app: app,
+	fetch: app.fetch,
+	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+		ctx.waitUntil(ScraperService.processPending(env));
+	},
+};

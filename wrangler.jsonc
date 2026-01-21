@@ -3,6 +3,11 @@
 	"main": "src/index.ts",
 	"name": "news-summarizer",
 	"upload_source_maps": true,
+	"triggers": {
+		"crons": [
+			"*/10 * * * *"
+		]
+	},
 	"observability": {
 		"enabled": true
 	},
