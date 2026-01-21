@@ -1,0 +1,16 @@
+{
+	"compatibility_date": "2025-10-08",
+	"main": "src/index.ts",
+	"name": "news-summarizer",
+	"upload_source_maps": true,
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "newsdb",
+			"database_id": "d1b60bd9-a120-48ab-8282-dcd55fd578ed"
+		}
+	]
+}
