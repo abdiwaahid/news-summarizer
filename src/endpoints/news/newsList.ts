@@ -12,8 +12,8 @@ export class NewsList extends D1ListEndpoint<HandleArgs> {
         summary: "List and search news",
         request: {
             query: z.object({
-                search: z.string().optional().description("Search by title"),
-                is_filled: Bool({ optional: true, description: "Filter items with scraped content" }),
+                search: z.string().optional(),
+                is_filled: Bool({ description: "Filter items with scraped content" }),
                 limit: z.number().int().default(20),
                 page: z.number().int().default(1),
             }),
