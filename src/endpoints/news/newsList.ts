@@ -13,7 +13,7 @@ export class NewsList extends D1ListEndpoint<HandleArgs> {
         request: {
             query: z.object({
                 search: z.string().optional(),
-                is_filled: Bool({ description: "Filter items with scraped content" }),
+                is_filled: Bool({ required: false, description: "Filter items with scraped content" }),
                 limit: z.number().int().default(20),
                 page: z.number().int().default(1),
             }),
