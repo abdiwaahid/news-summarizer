@@ -15,8 +15,7 @@ export const ScraperService = {
 
                 const content = document.querySelector("body")?.textContent?.trim();
                 const image = document.querySelector('meta[property="og:image"]')?.getAttribute("content");
-
-                // Update the row (Replaces n8n "Update row in sheet1")
+                
                 await env.DB.prepare(
                     "UPDATE news SET content = ?, image_url = ? WHERE id = ?"
                 ).bind(content, image, row.id).run();

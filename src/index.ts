@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { newsRouter } from "./endpoints/news/router";
 import { ContentfulStatusCode } from "hono/utils/http-status";
 import { ScraperService } from "./services/scraper";
+import { RssService } from "./services/rssService";
 
 // Start a Hono app
 const app = new Hono<{ Bindings: Env }>();
@@ -47,6 +48,13 @@ export default {
 	app: app,
 	fetch: app.fetch,
 	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-		ctx.waitUntil(ScraperService.processPending(env));
+		switch (event.cron) {
+            case "*/20 * * * *":
+                ctx.waitUntil(RssService.syncAll(env));
+                break;
+            case "*/10 * * * *":
+                ctx.waitUntil(ScraperService.processPending(env));
+                break;
+        }
 	},
 };
