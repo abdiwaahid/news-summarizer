@@ -6,7 +6,6 @@ export class NewsList extends D1ListEndpoint<HandleArgs> {
 	_meta = {
 		model: NewsModel,
 	};
-
 	searchFields = ["title"];
 	defaultOrderBy = "id DESC";
 }
