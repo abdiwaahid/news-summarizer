@@ -36,7 +36,7 @@ export const RssService = {
                         statements.push(
                             env.DB.prepare(`
                                 INSERT OR IGNORE INTO news (title, url, pub_date) 
-                                VALUES (?, ?, ?, ?)
+                                VALUES (?, ?, ?)
                             `).bind(title, link, pubDate)
                         );
                     }
