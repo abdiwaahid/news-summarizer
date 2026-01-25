@@ -27,13 +27,19 @@ export const RssService = {
                     const title = item.querySelector("title")?.textContent || "";
                     const link = item.querySelector("link")?.textContent || "";
                     const pubDate = item.querySelector("pubDate")?.textContent || "";
-
-                    statements.push(
-                        env.DB.prepare(`
-                            INSERT OR IGNORE INTO news (title, url, pub_date) 
-                            VALUES (?, ?, ?, ?)
-                        `).bind(title, link, pubDate)
-                    );
+                    
+                    const date = new Date(pubDate);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    if(date >= today){
+                        statements.push(
+                            env.DB.prepare(`
+                                INSERT OR IGNORE INTO news (title, url, pub_date) 
+                                VALUES (?, ?, ?, ?)
+                            `).bind(title, link, pubDate)
+                        );
+                    }
                 }
             } catch (err) {
                 console.error(`Failed to fetch RSS from ${url}:`, err);
