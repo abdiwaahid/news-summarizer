@@ -9,7 +9,9 @@ declare namespace Cloudflare {
 		DB: D1Database;
 	}
 }
-interface Env extends Cloudflare.Env {}
+interface Env extends Cloudflare.Env {
+    GROK_API: any;
+}
 
 // Begin runtime types
 /*! *****************************************************************************
