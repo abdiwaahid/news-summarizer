@@ -15,7 +15,14 @@
 		{
 			"binding": "DB",
 			"database_name": "newsdb",
-			"database_id": "d1b60bd9-a120-48ab-8282-dcd55fd578ed"
+			"database_id": "c119f765-e583-4392-a24c-da7c3cefeecd",
+			"remote": true
 		}
-	]
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"vars": {
+		"FACEBOOK_TOKEN": ""
+	}
 }

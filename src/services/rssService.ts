@@ -2,23 +2,24 @@ import { parseHTML } from "linkedom";
 
 export const RssService = {
     SOURCES: [
-        'https://horseedmedia.net/feed/',
-        'https://puntlandpost.net/feed/',
-        'https://www.caasimada.net/feed/',
-        'https://shabellemedia.com/feed/',
-        'https://sonna.so/so/feed/',
-        'https://www.hiiraan.com/wararkamaanta.xml'
+        "https://horseedmedia.net/feed/",
+        "https://puntlandpost.net/feed/",
+        "https://www.caasimada.net/feed/",
+        "https://shabellemedia.com/feed/",
+        "https://sonna.so/so/feed/",
+        "https://www.hiiraan.com/wararkamaanta.xml",
     ],
 
     async syncAll(env: Env) {
         const statements = [];
-
         const today = new Date();
         today.setUTCHours(0, 0, 0, 0);
 
         for (const url of this.SOURCES) {
             try {
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    headers: { "User-Agent": "Mozilla/5.0 (compatible; Cloudflare Worker)" },
+                });
                 const xml = await response.text();
                 const { document } = parseHTML(xml, "text/xml");
                 const items = document.querySelectorAll("item");
@@ -27,12 +28,12 @@ export const RssService = {
                     const title = item.querySelector("title")?.textContent || "";
                     const link = item.querySelector("link")?.textContent || "";
                     const pubDate = item.querySelector("pubDate")?.textContent || "";
-                    
+
                     const date = new Date(pubDate);
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    
-                    if(date >= today){
+
+                    if (date >= today) {
                         statements.push(
                             env.DB.prepare(`
                                 INSERT OR IGNORE INTO news (title, url, pub_date) 
@@ -50,5 +51,19 @@ export const RssService = {
             await env.DB.batch(statements);
             console.log(`Successfully processed ${statements.length} items via batch.`);
         }
-    }
+    },
+
+    async removePrevNews(env: Env) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+        await env.DB.prepare(
+            "DELETE FROM news WHERE DATE(pub_date) < ?"
+        ).bind(yesterdayStr).run();
+
+        console.log("Removed previous days news");
+    },
 };
