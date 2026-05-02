@@ -131,16 +131,44 @@ function escapeControlCharsInJsonStrings(json: string): string {
     return escaped;
 }
 
+const SUMMARY_MODEL = "@cf/google/gemma-4-26b-a4b-it" as keyof AiModels;
+const MAX_SUMMARIES_PER_RUN = 1;
+const MAX_ARTICLE_CHARS_FOR_AI = 6000;
+const MAX_SUMMARY_OUTPUT_TOKENS = 700;
+
+function trimArticleForAi(content: string): string {
+    const trimmed = content.trim();
+
+    if (trimmed.length <= MAX_ARTICLE_CHARS_FOR_AI) {
+        return trimmed;
+    }
+
+    return trimmed.slice(0, MAX_ARTICLE_CHARS_FOR_AI).trim();
+}
+
 export const SummarizeService = {
     async summarizePending(env: Env, ai: Ai) {
-        const model = "@cf/google/gemma-3-12b-it" as keyof AiModels;
         const { results } = await env.DB.prepare(
-            "SELECT id, title, content FROM news WHERE label='New' AND (post IS NULL OR post = '') AND content IS NOT NULL LIMIT 5"
-        ).all();
+            `SELECT id, title, content
+             FROM news
+             WHERE label='New'
+               AND (post IS NULL OR post = '')
+               AND content IS NOT NULL
+             ORDER BY pub_date DESC
+             LIMIT ?`
+        ).bind(MAX_SUMMARIES_PER_RUN).all();
+
+        if (results.length === 0) {
+            return;
+        }
+
+        console.log(
+            `Summarizing ${results.length} article(s) with ${SUMMARY_MODEL}; input capped at ${MAX_ARTICLE_CHARS_FOR_AI} chars each.`
+        );
 
         for (const row of results) {
             try {
-                const response = await ai.run(model, {
+                const response = await ai.run(SUMMARY_MODEL, {
                     messages: [
                         {
                             role: "system",
@@ -158,11 +186,11 @@ Absolute rules – waa inaad 100% raacdaa:
                         },
                         {
                             role: "user",
-                            content: "Warka la soo koobayo:\n " + (row.content as string) + "\n\nSoo koob sida kor ku xusan. Ku celi JSON object keliya.",
+                            content: "Warka la soo koobayo:\n " + trimArticleForAi(row.content as string) + "\n\nSoo koob sida kor ku xusan. Ku celi JSON object keliya.",
                         },
                     ],
                     temperature: 0.05,
-                    max_tokens: 1024,
+                    max_tokens: MAX_SUMMARY_OUTPUT_TOKENS,
                 });
 
                 const rawJson = extractAiText(response);
