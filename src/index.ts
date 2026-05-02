@@ -4,6 +4,24 @@ import { LabelTitleService } from "./services/labelTitle";
 import { SummarizeService } from "./services/summarize";
 import { PostService } from "./services/postService";
 
+async function runScheduledJobs(env: Env): Promise<void> {
+	const now = new Date();
+	const minute = now.getMinutes();
+
+	await RssService.syncAll(env);
+	await ScraperService.processPending(env);
+	await LabelTitleService.checkDuplicates(env, env.AI);
+	await SummarizeService.summarizePending(env, env.AI);
+
+	if (minute % 30 === 0) {
+		await PostService.postPending(env);
+	}
+
+	if (now.getHours() === 6 && minute === 0) {
+		await RssService.removePrevNews(env);
+	}
+}
+
 export default {
 	async fetch(req) {
 		const url = new URL(req.url);
@@ -15,22 +33,6 @@ export default {
 	},
 
 	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-		const now = new Date();
-		const minute = now.getMinutes();
-		ctx.waitUntil(RssService.syncAll(env));
-		ctx.waitUntil(ScraperService.processPending(env));
-
-		if (minute % 50 === 0) {
-			ctx.waitUntil(LabelTitleService.checkDuplicates(env, env.AI));
-		}
-
-		if (minute % 30 === 0) {
-			ctx.waitUntil(SummarizeService.summarizePending(env, env.AI));
-			ctx.waitUntil(PostService.postPending(env));
-		}
-
-		if (now.getHours() === 6 && minute === 0) {
-			ctx.waitUntil(RssService.removePrevNews(env));
-		}
+		ctx.waitUntil(runScheduledJobs(env));
 	}
 } satisfies ExportedHandler<Env>;

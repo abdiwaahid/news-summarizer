@@ -39,11 +39,6 @@ export const RssService = {
                     const link = extractField(itemXml, "link");
                     const pubDate = extractField(itemXml, "pubDate");
                     
-                    console.log({
-                        title,
-                        link,
-                        pubDate,
-                    })
                     const date = new Date(pubDate);
 
                     if (date >= todayThreshold) {

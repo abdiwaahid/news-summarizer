@@ -28,7 +28,7 @@
 		"binding": "AI"
 	},
 	"vars": {
-		"FACEBOOK_TOKEN": ""
+		"FACEBOOK_PAGE_ID": "111207261825972"
 	},
 	"compatibility_flags": [
 		"nodejs_compat"
