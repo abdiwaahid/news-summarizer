@@ -1,4 +1,9 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
 {
+	"$schema": "node_modules/wrangler/config-schema.json",
 	"compatibility_date": "2025-10-08",
 	"main": "src/index.ts",
 	"name": "news-summarizer",
@@ -9,19 +14,7 @@
 		]
 	},
 	"observability": {
-		"enabled": false,
-		"head_sampling_rate": 1,
-		"logs": {
-			"enabled": true,
-			"head_sampling_rate": 1,
-			"persist": true,
-			"invocation_logs": true
-		},
-		"traces": {
-			"enabled": false,
-			"persist": true,
-			"head_sampling_rate": 1
-		}
+		"enabled": true
 	},
 	"d1_databases": [
 		{
@@ -36,5 +29,8 @@
 	},
 	"vars": {
 		"FACEBOOK_TOKEN": ""
-	}
+	},
+	"compatibility_flags": [
+		"nodejs_compat"
+	]
 }
