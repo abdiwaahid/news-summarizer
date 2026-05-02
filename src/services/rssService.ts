@@ -1,4 +1,13 @@
-import { parseHTML } from "linkedom";
+function extractField(xml: string, fieldName: string): string {
+    const startTag = `<${fieldName}>`;
+    const endTag = `</${fieldName}>`;
+    const startIdx = xml.indexOf(startTag);
+    if (startIdx === -1) return "";
+    const valueStart = startIdx + startTag.length;
+    const endIdx = xml.indexOf(endTag, valueStart);
+    if (endIdx === -1) return "";
+    return xml.substring(valueStart, endIdx).trim();
+}
 
 export const RssService = {
     SOURCES: [
@@ -12,8 +21,8 @@ export const RssService = {
 
     async syncAll(env: Env) {
         const statements = [];
-        const today = new Date();
-        today.setUTCHours(0, 0, 0, 0);
+        const todayThreshold = new Date();
+        todayThreshold.setUTCHours(0, 0, 0, 0);
 
         for (const url of this.SOURCES) {
             try {
@@ -21,19 +30,23 @@ export const RssService = {
                     headers: { "User-Agent": "Mozilla/5.0 (compatible; Cloudflare Worker)" },
                 });
                 const xml = await response.text();
-                const { document } = parseHTML(xml, "text/xml");
-                const items = document.querySelectorAll("item");
-
-                for (const item of items) {
-                    const title = item.querySelector("title")?.textContent || "";
-                    const link = item.querySelector("link")?.textContent || "";
-                    const pubDate = item.querySelector("pubDate")?.textContent || "";
-
+                
+                const itemPattern = /<item[^>]*>[\s\S]*?<\/item>/gi;
+                const itemMatches = xml.match(itemPattern) || [];
+                
+                for (const itemXml of itemMatches) {
+                    const title = extractField(itemXml, "title");
+                    const link = extractField(itemXml, "link");
+                    const pubDate = extractField(itemXml, "pubDate");
+                    
+                    console.log({
+                        title,
+                        link,
+                        pubDate,
+                    })
                     const date = new Date(pubDate);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
 
-                    if (date >= today) {
+                    if (date >= todayThreshold) {
                         statements.push(
                             env.DB.prepare(`
                                 INSERT OR IGNORE INTO news (title, url, pub_date) 

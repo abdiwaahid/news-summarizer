@@ -14,17 +14,11 @@ export default {
 		);
 	},
 
-	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
 		const now = new Date();
 		const minute = now.getMinutes();
-		console.log("Scheduled event triggered", { minute, controller, env, ctx });
-		if (minute % 60 === 0) {
-			ctx.waitUntil(RssService.syncAll(env));
-		}
-
-		if (minute % 10 === 0) {
-			ctx.waitUntil(ScraperService.processPending(env));
-		}
+		ctx.waitUntil(RssService.syncAll(env));
+		ctx.waitUntil(ScraperService.processPending(env));
 
 		if (minute % 50 === 0) {
 			ctx.waitUntil(LabelTitleService.checkDuplicates(env, env.AI));
@@ -38,5 +32,5 @@ export default {
 		if (now.getHours() === 6 && minute === 0) {
 			ctx.waitUntil(RssService.removePrevNews(env));
 		}
-	},
+	}
 } satisfies ExportedHandler<Env>;

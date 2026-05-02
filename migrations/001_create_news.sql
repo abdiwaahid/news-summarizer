@@ -14,3 +14,4 @@ CREATE TABLE IF NOT EXISTS news (
 
 CREATE INDEX IF NOT EXISTS idx_news_label ON news(label);
 CREATE INDEX IF NOT EXISTS idx_news_pub_date ON news(pub_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_news_url_unique ON news(url);

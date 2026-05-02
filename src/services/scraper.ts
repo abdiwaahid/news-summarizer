@@ -11,7 +11,7 @@ const SITE_CONFIGS: Record<string, { title: string; content: string; image: stri
         content: ".entry-content.single-post-content p",
         image: ".entry-content.single-post-content figure.wp-block-image img",
     },
-    "www.caasimada.net": {
+    "caasimada.net": {
         title: "h1.entry-title, h1.tdb-title-text",
         content: ".td-post-content p, .tdb_single_content p",
         image: ".td-post-featured-image img, .tdb_single_featured_image img, .td-post-content img",
@@ -26,8 +26,8 @@ const SITE_CONFIGS: Record<string, { title: string; content: string; image: stri
         content: ".entry-content p, .s-ct p, .single-content p",
         image: ".featured-holder img, .single-featured img, .entry-content img",
     },
-    "www.hiiraan.com": {
-        title: "h1.story-title",
+    "hiiraan.com": {
+        title: "h1.story-title, .article-header h1",
         content: ".story-content p, .article-content p",
         image: ".story-image img, .article-image img",
     },
@@ -44,6 +44,31 @@ function getHostname(url: string): string {
 function getConfigByUrl(url: string): { title: string; content: string; image: string } | null {
     const hostname = getHostname(url);
     return SITE_CONFIGS[hostname] || null;
+}
+
+function cleanText(text: string): string {
+    return text.replace(/\s+/g, " ").trim();
+}
+
+function isUsefulContent(text: string): boolean {
+    if (text.length < 50) return false;
+    if (/[{}]|@media|!important|rgba?\(|#[a-f0-9]{3,6}/i.test(text)) return false;
+    if (/^(facebook|twitter|somali links|rss)$/i.test(text)) return false;
+    return true;
+}
+
+function getArticleContent(document: any, selector: string): string {
+    const elements = [...document.querySelectorAll(selector)] as any[];
+    return elements
+        .map((el) => cleanText(el.textContent || ""))
+        .filter(isUsefulContent)
+        .join("\n");
+}
+
+function removeNonContentNodes(document: any): void {
+    for (const el of [...document.querySelectorAll("script, style, noscript, svg")] as any[]) {
+        el.remove();
+    }
 }
 
 export const ScraperService = {
@@ -67,17 +92,20 @@ export const ScraperService = {
                 let image: string | null = null;
 
                 if (config) {
-                    const elements = [...document.querySelectorAll(config.content)] as any[];
-                    content = elements
-                        .map((el) => el.textContent?.trim())
-                        .filter(Boolean)
-                        .join("\n");
+                    content = getArticleContent(document, config.content);
 
                     const imgEl = document.querySelector(config.image);
                     image = imgEl?.getAttribute("src") || imgEl?.getAttribute("data-src") || null;
                 } else {
                     image = document.querySelector('meta[property="og:image"]')?.getAttribute("content");
-                    content = document.querySelector("body")?.textContent?.trim().substring(0, 5000);
+                    removeNonContentNodes(document);
+                    const bodyEl = document.querySelector("body");
+                    const allText = bodyEl?.textContent?.trim() || "";
+                    const lines = allText
+                        .split("\n")
+                        .map(cleanText)
+                        .filter(isUsefulContent);
+                    content = lines.slice(0, 50).join("\n").substring(0, 5000);
                 }
 
                 if (image && image.startsWith("/")) {

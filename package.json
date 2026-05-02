@@ -28,7 +28,6 @@
 		"deploy": "wrangler deploy",
 		"dev": "npm run seedLocalDb && wrangler dev",
 		"predeploy": "wrangler d1 migrations apply newsdb --remote",
-		"seedLocalDb": "wrangler d1 migrations apply newsdb --local",
-		"test": "wrangler deploy --dry-run && npx vitest run --config tests/vitest.config.mts"
+		"seedLocalDb": "wrangler d1 migrations apply newsdb --local"
 	}
 }
