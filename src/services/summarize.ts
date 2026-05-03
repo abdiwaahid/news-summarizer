@@ -95,6 +95,17 @@ function getJsonObjectCandidate(text: string): string {
 const SUMMARY_MODEL = "@cf/google/gemma-4-26b-a4b-it" as keyof AiModels;
 const MAX_SUMMARIES_PER_RUN = 2;
 
+function isAiUsageLimitError(error: unknown): boolean {
+    const details = error instanceof Error
+        ? `${error.name} ${error.message} ${error.stack || ""}`
+        : JSON.stringify(error);
+
+    return /quota|limit|usage|neuron|exceed|exceeded|too many requests|rate.?limit|429|402/i.test(details);
+}
+
+function contentAsPost(content: string): string {
+    return content.trim();
+}
 
 async function generateSummary(ai: Ai, content: string): Promise<string> {
     const response = await ai.run(SUMMARY_MODEL, {
@@ -165,15 +176,34 @@ export const SummarizeService = {
             `Summarizing ${results.length} article(s) with ${SUMMARY_MODEL}`
         );
 
+        let aiUsageLimitReached = false;
+
         for (const row of results) {
             try {
-                const post = await summarizeArticle(ai, row.content as string);
+                const content = row.content as string;
+                const post = aiUsageLimitReached
+                    ? contentAsPost(content)
+                    : await summarizeArticle(ai, content);
+
                 await env.DB.prepare(
                     "UPDATE news SET post = ?, processed = 1 WHERE id = ?"
                 ).bind(post, row.id).run();
 
-                console.log(`Summarized article ${row.id}`);
+                console.log(aiUsageLimitReached
+                    ? `Used content as post for article ${row.id} because AI usage limit was reached.`
+                    : `Summarized article ${row.id}`
+                );
             } catch (err) {
+                if (isAiUsageLimitError(err)) {
+                    aiUsageLimitReached = true;
+                    const post = contentAsPost(row.content as string);
+                    await env.DB.prepare(
+                        "UPDATE news SET post = ?, processed = 1 WHERE id = ?"
+                    ).bind(post, row.id).run();
+                    console.warn(`AI usage limit reached; used content as post for article ${row.id}.`);
+                    continue;
+                }
+
                 console.error(`Failed to summarize article ${row.id}:`, err);
             }
         }
