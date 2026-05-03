@@ -13,13 +13,13 @@ async function runScheduledJobs(env: Env): Promise<void> {
 	await LabelTitleService.checkDuplicates(env, env.AI);
 	await SummarizeService.summarizePending(env, env.AI);
 
-	if (minute % 30 === 0) {
-		await PostService.postPending(env);
-	}
+	// if (minute % 30 === 0) {
+	// 	await PostService.postPending(env);
+	// }
 
-	if (now.getHours() === 6 && minute === 0) {
-		await RssService.removePrevNews(env);
-	}
+	// if (now.getHours() === 6 && minute === 0) {
+	// 	await RssService.removePrevNews(env);
+	// }
 }
 
 export default {

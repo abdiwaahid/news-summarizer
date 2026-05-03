@@ -24,7 +24,6 @@ function getTextContent(value: unknown): string | null {
 
     return text.trim() || null;
 }
-
 function extractAiText(response: unknown): string {
     const directText = getTextContent(response);
     if (directText) {
@@ -65,19 +64,15 @@ function extractAiText(response: unknown): string {
     );
 }
 
-function parsePostJson(rawJson: string): string {
-    const cleanedJson = rawJson
+function parsePostJson(rawText: string): string {
+    const cleanedText = rawText
         .trim()
+        .replace(/^Response:\s*/i, "")
         .replace(/^```(?:json)?\s*/i, "")
         .replace(/\s*```$/i, "")
         .trim();
-
-    let parsed: { post?: unknown };
-    try {
-        parsed = JSON.parse(cleanedJson) as { post?: unknown };
-    } catch {
-        parsed = JSON.parse(escapeControlCharsInJsonStrings(cleanedJson)) as { post?: unknown };
-    }
+    const jsonText = getJsonObjectCandidate(cleanedText);
+    const parsed = JSON.parse(jsonText) as { post?: unknown };
 
     if (typeof parsed.post !== "string" || parsed.post.trim() === "") {
         throw new Error("AI JSON response did not include a valid post string.");
@@ -86,64 +81,69 @@ function parsePostJson(rawJson: string): string {
     return parsed.post.trim();
 }
 
-function escapeControlCharsInJsonStrings(json: string): string {
-    let escaped = "";
-    let inString = false;
-    let previousWasEscape = false;
+function getJsonObjectCandidate(text: string): string {
+    const firstBrace = text.indexOf("{");
+    const lastBrace = text.lastIndexOf("}");
 
-    for (const char of json) {
-        if (previousWasEscape) {
-            escaped += char;
-            previousWasEscape = false;
-            continue;
-        }
-
-        if (char === "\\") {
-            escaped += char;
-            previousWasEscape = true;
-            continue;
-        }
-
-        if (char === "\"") {
-            inString = !inString;
-            escaped += char;
-            continue;
-        }
-
-        if (inString && char === "\n") {
-            escaped += "\\n";
-            continue;
-        }
-
-        if (inString && char === "\r") {
-            escaped += "\\r";
-            continue;
-        }
-
-        if (inString && char === "\t") {
-            escaped += "\\t";
-            continue;
-        }
-
-        escaped += char;
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+        return text;
     }
 
-    return escaped;
+    return text.slice(firstBrace, lastBrace + 1);
 }
 
 const SUMMARY_MODEL = "@cf/google/gemma-4-26b-a4b-it" as keyof AiModels;
-const MAX_SUMMARIES_PER_RUN = 1;
-const MAX_ARTICLE_CHARS_FOR_AI = 6000;
-const MAX_SUMMARY_OUTPUT_TOKENS = 700;
+const MAX_SUMMARIES_PER_RUN = 2;
 
-function trimArticleForAi(content: string): string {
-    const trimmed = content.trim();
 
-    if (trimmed.length <= MAX_ARTICLE_CHARS_FOR_AI) {
-        return trimmed;
+async function generateSummary(ai: Ai, content: string): Promise<string> {
+    const response = await ai.run(SUMMARY_MODEL, {
+        messages: [
+            {
+                role: "system",
+                content: `Role: Social Media Manager - Af-Soomaali Facebook posts only
+
+Absolute rules - waa inaad 100% raacdaa:
+- Af-Soomaali fudud oo dadweyne kaliya
+- Mamnuuc: source, website, qoraa, link, emoji, bullet, number, cinwaan, related news
+- Ha ku bilaabin magaalo ama dateline sida MUQDISHO.
+- Ha sheegin hay'ad, warbaahin, ama qofka/qoraaga warka haddii aysan ahayn qodobka ugu muhiimsan ee dhacdada.
+- Qaab: sadarro isku xiran + double newline kadib sadar kasta
+- Habka: ugu muhiimsan -> faahfaahin -> gabagabo kooban
+- Do not think step by step. Do not draft. Do not explain your reasoning.
+- Return valid JSON only. No markdown, no code block, no explanation.
+- JSON shape must be exactly: {"post":"..."}
+- The post value must be one JSON string. Escape paragraph breaks as \\n\\n. Do not put raw line breaks inside the string.`,
+            },
+            {
+                role: "user",
+                content: "Warka la soo koobayo:\n " + content + "\n\nSoo koob sida kor ku xusan. Ku celi JSON object keliya.",
+            },
+        ],
+        response_format: {
+            type: "json_object",
+            json_schema: {
+                name: "post",
+                schema: {
+                    post: {
+                        type: "string",
+                    },
+                },
+            },
+        },
+    });
+
+    return extractAiText(response);
+}
+
+async function summarizeArticle(ai: Ai, content: string): Promise<string> {
+    try {
+        const rawJson = await generateSummary(ai, content);
+        console.log("Response:", rawJson);
+        return parsePostJson(rawJson);
+    } catch (error) {
+        throw error;
     }
-
-    return trimmed.slice(0, MAX_ARTICLE_CHARS_FOR_AI).trim();
 }
 
 export const SummarizeService = {
@@ -163,38 +163,12 @@ export const SummarizeService = {
         }
 
         console.log(
-            `Summarizing ${results.length} article(s) with ${SUMMARY_MODEL}; input capped at ${MAX_ARTICLE_CHARS_FOR_AI} chars each.`
+            `Summarizing ${results.length} article(s) with ${SUMMARY_MODEL}`
         );
 
         for (const row of results) {
             try {
-                const response = await ai.run(SUMMARY_MODEL, {
-                    messages: [
-                        {
-                            role: "system",
-                            content: `Role: Social Media Manager – Af-Soomaali Facebook posts only
-
-Absolute rules – waa inaad 100% raacdaa:
-- Af-Soomaali fudud oo dadweyne kaliya
-- Mamnuuc: source • website • qoraa • link • emoji • bullet • number • cinwaan • related news
-- Qaab: sadarro isku xiran + double newline kadib sadar kasta
-- Dherer: 120–240 erey (4–7 sadar)
-- Habka: ugu muhiimsan → faahfaahin → gabagabo kooban
-- Return valid JSON only. No markdown, no code block, no explanation.
-- JSON shape must be exactly: {"post":"..."}
-- The post value must be one JSON string. Escape paragraph breaks as \\n\\n. Do not put raw line breaks inside the string.`,
-                        },
-                        {
-                            role: "user",
-                            content: "Warka la soo koobayo:\n " + trimArticleForAi(row.content as string) + "\n\nSoo koob sida kor ku xusan. Ku celi JSON object keliya.",
-                        },
-                    ],
-                    temperature: 0.05,
-                    max_tokens: MAX_SUMMARY_OUTPUT_TOKENS,
-                });
-
-                const rawJson = extractAiText(response);
-                const post = parsePostJson(rawJson);
+                const post = await summarizeArticle(ai, row.content as string);
                 await env.DB.prepare(
                     "UPDATE news SET post = ?, processed = 1 WHERE id = ?"
                 ).bind(post, row.id).run();
