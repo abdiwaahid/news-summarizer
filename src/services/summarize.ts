@@ -153,7 +153,7 @@ export const SummarizeService = {
              WHERE label='New'
                AND (post IS NULL OR post = '')
                AND content IS NOT NULL
-             ORDER BY pub_date DESC
+             ORDER BY id
              LIMIT ?`
         ).bind(MAX_SUMMARIES_PER_RUN).all();
 
