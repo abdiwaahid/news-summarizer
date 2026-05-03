@@ -139,7 +139,6 @@ Absolute rules - waa inaad 100% raacdaa:
 async function summarizeArticle(ai: Ai, content: string): Promise<string> {
     try {
         const rawJson = await generateSummary(ai, content);
-        console.log("Response:", rawJson);
         return parsePostJson(rawJson);
     } catch (error) {
         throw error;
