@@ -11,7 +11,10 @@ type FacebookResult = {
 };
 
 function trimFacebookText(text: string): string {
-    const trimmed = text.trim();
+    const trimmed = text
+        .replace(/\\r\\n/g, "\n")
+        .replace(/\\n/g, "\n")
+        .trim();
 
     if (trimmed.length <= MAX_FACEBOOK_TEXT_LENGTH) {
         return trimmed;

@@ -64,6 +64,13 @@ function extractAiText(response: unknown): string {
     );
 }
 
+function normalizePostText(text: string): string {
+    return text
+        .replace(/\\r\\n/g, "\n")
+        .replace(/\\n/g, "\n")
+        .trim();
+}
+
 function parsePostJson(rawText: string): string {
     const cleanedText = rawText
         .trim()
@@ -78,7 +85,7 @@ function parsePostJson(rawText: string): string {
         throw new Error("AI JSON response did not include a valid post string.");
     }
 
-    return parsed.post.trim();
+    return normalizePostText(parsed.post);
 }
 
 function getJsonObjectCandidate(text: string): string {
@@ -104,7 +111,7 @@ function isAiUsageLimitError(error: unknown): boolean {
 }
 
 function contentAsPost(content: string): string {
-    return content.trim();
+    return normalizePostText(content);
 }
 
 async function generateSummary(ai: Ai, content: string): Promise<string> {
