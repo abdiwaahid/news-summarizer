@@ -100,7 +100,7 @@ function getJsonObjectCandidate(text: string): string {
 }
 
 const SUMMARY_MODEL = "@cf/google/gemma-4-26b-a4b-it" as keyof AiModels;
-const MAX_SUMMARIES_PER_RUN = 2;
+const MAX_SUMMARIES_PER_RUN = 1;
 
 function isAiUsageLimitError(error: unknown): boolean {
     const details = error instanceof Error

@@ -9,6 +9,53 @@ function extractField(xml: string, fieldName: string): string {
     return xml.substring(valueStart, endIdx).trim();
 }
 
+const MAX_RSS_ITEMS_PER_SOURCE = 15;
+const SOURCE_ROTATION_MS = 5 * 60 * 1000;
+
+async function syncSource(env: Env, url: string): Promise<void> {
+    const statements: D1PreparedStatement[] = [];
+    const todayThreshold = new Date();
+    todayThreshold.setUTCHours(0, 0, 0, 0);
+
+    try {
+        const response = await fetch(url, {
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; Cloudflare Worker)" },
+        });
+        const xml = await response.text();
+        const itemPattern = /<item[^>]*>[\s\S]*?<\/item>/gi;
+
+        let itemCount = 0;
+        let match: RegExpExecArray | null;
+        while (
+            itemCount < MAX_RSS_ITEMS_PER_SOURCE &&
+            (match = itemPattern.exec(xml)) !== null
+        ) {
+            itemCount++;
+            const itemXml = match[0];
+            const title = extractField(itemXml, "title");
+            const link = extractField(itemXml, "link");
+            const pubDate = extractField(itemXml, "pubDate");
+            const date = new Date(pubDate);
+
+            if (title && link && date >= todayThreshold) {
+                statements.push(
+                    env.DB.prepare(`
+                        INSERT OR IGNORE INTO news (title, url, pub_date)
+                        VALUES (?, ?, ?)
+                    `).bind(title, link, pubDate)
+                );
+            }
+        }
+    } catch (err) {
+        console.error(`Failed to fetch RSS from ${url}:`, err);
+    }
+
+    if (statements.length > 0) {
+        await env.DB.batch(statements);
+        console.log(`Processed ${statements.length} RSS item(s) from ${url}.`);
+    }
+}
+
 export const RssService = {
     SOURCES: [
         "https://horseedmedia.net/feed/",
@@ -20,45 +67,14 @@ export const RssService = {
     ],
 
     async syncAll(env: Env) {
-        const statements = [];
-        const todayThreshold = new Date();
-        todayThreshold.setUTCHours(0, 0, 0, 0);
-
         for (const url of this.SOURCES) {
-            try {
-                const response = await fetch(url, {
-                    headers: { "User-Agent": "Mozilla/5.0 (compatible; Cloudflare Worker)" },
-                });
-                const xml = await response.text();
-                
-                const itemPattern = /<item[^>]*>[\s\S]*?<\/item>/gi;
-                const itemMatches = xml.match(itemPattern) || [];
-                
-                for (const itemXml of itemMatches) {
-                    const title = extractField(itemXml, "title");
-                    const link = extractField(itemXml, "link");
-                    const pubDate = extractField(itemXml, "pubDate");
-                    
-                    const date = new Date(pubDate);
-
-                    if (date >= todayThreshold) {
-                        statements.push(
-                            env.DB.prepare(`
-                                INSERT OR IGNORE INTO news (title, url, pub_date) 
-                                VALUES (?, ?, ?)
-                            `).bind(title, link, pubDate)
-                        );
-                    }
-                }
-            } catch (err) {
-                console.error(`Failed to fetch RSS from ${url}:`, err);
-            }
+            await syncSource(env, url);
         }
+    },
 
-        if (statements.length > 0) {
-            await env.DB.batch(statements);
-            console.log(`Successfully processed ${statements.length} items via batch.`);
-        }
+    async syncNext(env: Env, scheduledTime: number) {
+        const sourceIndex = Math.floor(scheduledTime / SOURCE_ROTATION_MS) % this.SOURCES.length;
+        await syncSource(env, this.SOURCES[sourceIndex]);
     },
 
     async removePrevNews(env: Env) {

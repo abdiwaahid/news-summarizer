@@ -65,7 +65,7 @@ export const PostService = {
         }
 
         const { results } = await env.DB.prepare(
-            "SELECT id, post, image_url FROM news WHERE label='New' AND post IS NOT NULL AND posted = 0 ORDER BY pub_date DESC LIMIT 5"
+            "SELECT id, post, image_url FROM news WHERE label='New' AND post IS NOT NULL AND posted = 0 ORDER BY pub_date DESC LIMIT 1"
         ).all();
 
         for (const row of results) {

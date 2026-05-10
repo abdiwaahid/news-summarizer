@@ -1,5 +1,3 @@
-import { parseHTML } from "linkedom";
-
 const SITE_CONFIGS: Record<string, { title: string; content: string; image: string }> = {
     "horseedmedia.net": {
         title: "h1.entry-title",
@@ -33,6 +31,10 @@ const SITE_CONFIGS: Record<string, { title: string; content: string; image: stri
     },
 };
 
+const MAX_ARTICLES_PER_RUN = 1;
+const MAX_CONTENT_LENGTH = 5000;
+const MAX_PARAGRAPHS_PER_ARTICLE = 50;
+
 function getHostname(url: string): string {
     try {
         return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
@@ -57,25 +59,61 @@ function isUsefulContent(text: string): boolean {
     return true;
 }
 
-function getArticleContent(document: any, selector: string): string {
-    const elements = [...document.querySelectorAll(selector)] as any[];
-    return elements
-        .map((el) => cleanText(el.textContent || ""))
-        .filter(isUsefulContent)
-        .join("\n");
+class ParagraphCollector implements HTMLRewriterElementContentHandlers {
+    private currentText: string[] | null = null;
+    private readonly paragraphs: string[] = [];
+
+    element(element: Element): void {
+        this.currentText = [];
+        element.onEndTag(() => {
+            const text = cleanText((this.currentText || []).join(""));
+            if (
+                this.paragraphs.length < MAX_PARAGRAPHS_PER_ARTICLE &&
+                isUsefulContent(text)
+            ) {
+                this.paragraphs.push(text);
+            }
+            this.currentText = null;
+        });
+    }
+
+    text(text: Text): void {
+        if (this.currentText) {
+            this.currentText.push(text.text);
+        }
+    }
+
+    getContent(): string | null {
+        const content = this.paragraphs.join("\n").substring(0, MAX_CONTENT_LENGTH);
+        return content || null;
+    }
 }
 
-function removeNonContentNodes(document: any): void {
-    for (const el of [...document.querySelectorAll("script, style, noscript, svg")] as any[]) {
-        el.remove();
+class AttributeCollector implements HTMLRewriterElementContentHandlers {
+    value: string | null = null;
+
+    constructor(private readonly attributes: string[]) {}
+
+    element(element: Element): void {
+        if (this.value) {
+            return;
+        }
+
+        for (const attribute of this.attributes) {
+            const value = element.getAttribute(attribute);
+            if (value) {
+                this.value = value;
+                return;
+            }
+        }
     }
 }
 
 export const ScraperService = {
     async processPending(env: Env) {
         const { results } = await env.DB.prepare(
-            "SELECT id, url, title FROM news WHERE label='New' AND (content IS NULL OR content = '') LIMIT 10"
-        ).all();
+            "SELECT id, url, title FROM news WHERE label='New' AND (content IS NULL OR content = '') LIMIT ?"
+        ).bind(MAX_ARTICLES_PER_RUN).all();
 
         for (const row of results) {
             try {
@@ -83,30 +121,21 @@ export const ScraperService = {
                 const response = await fetch(url, {
                     headers: { "User-Agent": "Mozilla/5.0 (compatible; Cloudflare Worker)" },
                 });
-                const html = await response.text();
-                const { document } = parseHTML(html);
 
                 const config = getConfigByUrl(url);
+                const contentCollector = new ParagraphCollector();
+                const articleImageCollector = new AttributeCollector(["src", "data-src"]);
+                const fallbackImageCollector = new AttributeCollector(["content"]);
 
-                let content: string | null = null;
-                let image: string | null = null;
+                await new HTMLRewriter()
+                    .on(config?.content || "p", contentCollector)
+                    .on(config?.image || "img", articleImageCollector)
+                    .on('meta[property="og:image"]', fallbackImageCollector)
+                    .transform(response)
+                    .text();
 
-                if (config) {
-                    content = getArticleContent(document, config.content);
-
-                    const imgEl = document.querySelector(config.image);
-                    image = imgEl?.getAttribute("src") || imgEl?.getAttribute("data-src") || null;
-                } else {
-                    image = document.querySelector('meta[property="og:image"]')?.getAttribute("content");
-                    removeNonContentNodes(document);
-                    const bodyEl = document.querySelector("body");
-                    const allText = bodyEl?.textContent?.trim() || "";
-                    const lines = allText
-                        .split("\n")
-                        .map(cleanText)
-                        .filter(isUsefulContent);
-                    content = lines.slice(0, 50).join("\n").substring(0, 5000);
-                }
+                const content = contentCollector.getContent();
+                let image = articleImageCollector.value || fallbackImageCollector.value;
 
                 if (image && image.startsWith("/")) {
                     const baseUrl = getHostname(url);

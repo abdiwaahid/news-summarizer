@@ -12,9 +12,6 @@
 		],
 		"publish": true
 	},
-	"dependencies": {
-		"linkedom": "0.18.12"
-	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "0.10.11",
 		"@types/node": "24.10.1",

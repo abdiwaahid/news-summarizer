@@ -1,6 +1,6 @@
 const DUPLICATE_LABEL_MODEL = "@cf/meta/llama-3.2-1b-instruct" as keyof AiModels;
-const MAX_DUPLICATE_TITLES_PER_RUN = 25;
-const MAX_DUPLICATE_OUTPUT_TOKENS = 700;
+const MAX_DUPLICATE_TITLES_PER_RUN = 10;
+const MAX_DUPLICATE_OUTPUT_TOKENS = 300;
 
 function extractAiText(response: unknown): string {
     if (typeof response === "string") {
