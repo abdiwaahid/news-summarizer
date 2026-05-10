@@ -40,8 +40,8 @@ async function syncSource(env: Env, url: string): Promise<void> {
             if (title && link && date >= todayThreshold) {
                 statements.push(
                     env.DB.prepare(`
-                        INSERT OR IGNORE INTO news (title, url, pub_date)
-                        VALUES (?, ?, ?)
+                        INSERT OR IGNORE INTO news (title, url, pub_date, label)
+                        VALUES (?, ?, ?, NULL)
                     `).bind(title, link, pubDate)
                 );
             }

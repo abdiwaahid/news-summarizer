@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS news (
     pub_date TEXT,
     content TEXT,
     image_url TEXT,
-    label TEXT DEFAULT 'New',
+    label TEXT,
     post TEXT,
     posted INTEGER DEFAULT 0,
     processed INTEGER DEFAULT 0,
