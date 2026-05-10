@@ -1,5 +1,5 @@
 const DUPLICATE_LABEL_MODEL = "@cf/google/gemma-4-26b-a4b-it" as keyof AiModels;
-const MAX_DUPLICATE_TITLES_PER_RUN = 10;
+const MAX_DUPLICATE_TITLES_PER_RUN = 30;
 const MAX_REFERENCE_TITLES = 30;
 const MAX_DUPLICATE_OUTPUT_TOKENS = 600;
 const DISABLE_REASONING_OPTIONS = {
@@ -190,7 +190,7 @@ export const LabelTitleService = {
             `SELECT id, title
              FROM news
              WHERE label IS NULL OR label = ''
-             ORDER BY pub_date DESC
+             ORDER BY pub_date
              LIMIT ?`
         ).bind(MAX_DUPLICATE_TITLES_PER_RUN).all();
 
@@ -203,7 +203,7 @@ export const LabelTitleService = {
             `SELECT id, title
              FROM news
              WHERE label = 'New'
-             ORDER BY pub_date DESC
+             ORDER BY pub_date
              LIMIT ?`
         ).bind(MAX_REFERENCE_TITLES).all()).results.map(normalizeRow);
 
