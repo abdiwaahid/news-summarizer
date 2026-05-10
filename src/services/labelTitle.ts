@@ -2,6 +2,12 @@ const DUPLICATE_LABEL_MODEL = "@cf/google/gemma-4-26b-a4b-it" as keyof AiModels;
 const MAX_DUPLICATE_TITLES_PER_RUN = 10;
 const MAX_REFERENCE_TITLES = 30;
 const MAX_DUPLICATE_OUTPUT_TOKENS = 600;
+const DISABLE_REASONING_OPTIONS = {
+    reasoning_effort: null,
+    chat_template_kwargs: {
+        enable_thinking: false,
+    },
+} as const;
 
 type TitleRow = {
     id: number;
@@ -13,9 +19,37 @@ type DuplicateLabel = {
     label: "New" | "Duplicate";
 };
 
+function getTextContent(value: unknown): string | null {
+    if (typeof value === "string") {
+        return value.trim();
+    }
+
+    if (!Array.isArray(value)) {
+        return null;
+    }
+
+    const text = value
+        .map((item) => {
+            if (typeof item === "string") {
+                return item;
+            }
+
+            if (item && typeof item === "object" && "text" in item) {
+                return getTextContent((item as { text: unknown }).text);
+            }
+
+            return null;
+        })
+        .filter((item): item is string => Boolean(item))
+        .join("");
+
+    return text.trim() || null;
+}
+
 function extractAiText(response: unknown): string {
-    if (typeof response === "string") {
-        return response.trim();
+    const directText = getTextContent(response);
+    if (directText) {
+        return directText;
     }
 
     if (!response || typeof response !== "object") {
@@ -31,21 +65,25 @@ function extractAiText(response: unknown): string {
             message?: {
                 content?: unknown;
             };
+            finish_reason?: string | null;
         }>;
     };
 
     const text =
-        (typeof data.response === "string" && data.response) ||
-        (typeof data.output_text === "string" && data.output_text) ||
-        (typeof data.result?.response === "string" && data.result.response) ||
-        (typeof data.choices?.[0]?.message?.content === "string" && data.choices[0].message.content) ||
-        (typeof data.choices?.[0]?.text === "string" && data.choices[0].text);
+        getTextContent(data.response) ??
+        getTextContent(data.output_text) ??
+        getTextContent(data.result?.response) ??
+        getTextContent(data.choices?.[0]?.message?.content) ??
+        getTextContent(data.choices?.[0]?.text);
 
-    if (!text) {
-        throw new Error("AI response did not include text content.");
+    if (text) {
+        return text;
     }
 
-    return text.trim();
+    const finishReason = data.choices?.[0]?.finish_reason;
+    throw new Error(
+        `AI response did not include final text content${finishReason ? ` (finish_reason: ${finishReason})` : ""}.`
+    );
 }
 
 function getJsonObjectCandidate(text: string): string {
@@ -59,12 +97,56 @@ function getJsonObjectCandidate(text: string): string {
     return text.slice(firstBrace, lastBrace + 1);
 }
 
+function findDuplicateLabelsObject(response: unknown): { labels?: unknown } | null {
+    if (!response || typeof response !== "object") {
+        return null;
+    }
+
+    const data = response as {
+        labels?: unknown;
+        response?: unknown;
+        output?: unknown;
+        output_text?: unknown;
+        result?: unknown;
+        choices?: Array<{
+            message?: {
+                content?: unknown;
+            };
+            text?: unknown;
+        }>;
+    };
+
+    if (Array.isArray(data.labels)) {
+        return data;
+    }
+
+    const candidates = [
+        data.response,
+        data.output,
+        data.output_text,
+        data.result,
+        data.choices?.[0]?.message?.content,
+        data.choices?.[0]?.text,
+    ];
+
+    for (const candidate of candidates) {
+        const parsed = findDuplicateLabelsObject(candidate);
+        if (parsed) {
+            return parsed;
+        }
+    }
+
+    return null;
+}
+
 function parseDuplicateLabels(response: unknown): DuplicateLabel[] {
-    const rawJson = getJsonObjectCandidate(extractAiText(response)
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim());
-    const parsed = JSON.parse(rawJson) as { labels?: unknown };
+    const parsed = findDuplicateLabelsObject(response) ?? (() => {
+        const rawJson = getJsonObjectCandidate(extractAiText(response)
+            .replace(/^```(?:json)?\s*/i, "")
+            .replace(/\s*```$/i, "")
+            .trim());
+        return JSON.parse(rawJson) as { labels?: unknown };
+    })();
 
     if (!Array.isArray(parsed.labels)) {
         throw new Error("AI duplicate response did not include a labels array.");
@@ -140,6 +222,7 @@ Rules:
 - Use meaning, not wording. Somali and English titles can be duplicates of each other.
 - Different source names, "Sawirro/Daawo", punctuation, or small wording changes do not make it New.
 - If the candidate adds a genuinely different event, actor, outcome, or location, mark it "New".
+- Do not think step by step. Do not draft. Do not explain your reasoning.
 
 Return valid JSON only with this shape: {"labels":[{"id":123,"label":"New"}]}.`,
                     },
@@ -152,6 +235,7 @@ Return valid JSON only with this shape: {"labels":[{"id":123,"label":"New"}]}.`,
                             formatTitles(candidates),
                     },
                 ],
+                ...DISABLE_REASONING_OPTIONS,
                 temperature: 0,
                 max_tokens: MAX_DUPLICATE_OUTPUT_TOKENS,
                 response_format: {
