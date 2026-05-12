@@ -85,7 +85,7 @@ export const RssService = {
         const yesterdayStr = yesterday.toISOString().split("T")[0];
 
         await env.DB.prepare(
-            "DELETE FROM news WHERE DATE(pub_date) < ?"
+            "DELETE FROM news WHERE DATE(created_at) < ?"
         ).bind(yesterdayStr).run();
 
         console.log("Removed previous days news");
