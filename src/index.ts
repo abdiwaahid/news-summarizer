@@ -23,13 +23,16 @@ async function runScheduledJobs(env: Env, scheduledTime: number): Promise<void> 
 		return;
 	}
 
+	if ( minute === 30) {
+		await runScheduledStep("label", () => LabelTitleService.checkDuplicates(env, env.AI));
+		return;
+	}
+
 	switch (slot) {
 		case 0:
 			await runScheduledStep("rss", () => RssService.syncNext(env, scheduledTime));
 			break;
 		case 1:
-			await runScheduledStep("label", () => LabelTitleService.checkDuplicates(env, env.AI));
-			break;
 		case 2:
 			await runScheduledStep("scrape", () => ScraperService.processPending(env));
 			break;

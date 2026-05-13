@@ -9,16 +9,16 @@ const SITE_CONFIGS: Record<string, { title: string; content: string; image: stri
         content: ".entry-content.single-post-content p",
         image: ".entry-content.single-post-content figure.wp-block-image img",
     },
-    "caasimada.net": {
-        title: "h1.entry-title, h1.tdb-title-text",
-        content: ".td-post-content p, .tdb_single_content p",
-        image: ".td-post-featured-image img, .tdb_single_featured_image img, .td-post-content img",
-    },
-    "shabellemedia.com": {
-        title: "h1.entry-title",
-        content: ".td-post-content p",
-        image: ".td-post-featured-image img, .td-post-content img",
-    },
+     "caasimada.net": {
+         title: "h1.entry-title, h1.tdb-title-text",
+         content: ".td-post-content p, .tdb_single_content .tdb-block-inner p, .tdb_single_content p",
+         image: ".td-post-featured-image img, .tdb_single_featured_image img, .td-post-content img",
+     },
+     "shabellemedia.com": {
+         title: "h1.entry-title",
+         content: ".td-post-content div[dir='auto'], .td-post-content p",
+         image: ".td-post-featured-image img, .td-post-content img",
+     },
     "sonna.so": {
         title: "h1.entry-title, h1.s-title",
         content: ".entry-content p, .s-ct p, .single-content p",
@@ -141,7 +141,7 @@ export const ScraperService = {
                     const baseUrl = getHostname(url);
                     image = `https://${baseUrl}${image}`;
                 }
-
+                console.log("Scraped content ID:", row.id);
                 await env.DB.prepare(
                     "UPDATE news SET content = ?, image_url = ? WHERE id = ?"
                 ).bind(content, image, row.id).run();
